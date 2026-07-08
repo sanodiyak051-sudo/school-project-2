@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>विद्यालय प्रबंधन — संकुल मुंगवानीकला, जिला सिवनी</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<style>
+:root{
+  --navy:#1a2b4a;--navy-mid:#2d4070;--sky:#4a90d9;--saffron:#e8891a;
+  --green:#2e7d4f;--light:#f0f4fb;--border:#d0dae8;
+  --text:#1a2432;--muted:#607090;--card:#ffffff;--danger:#c0392b;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--light);color:var(--text);min-height:100vh;}
+
+/* SETUP SCREEN */
+#setupScreen{position:fixed;inset:0;background:linear-gradient(135deg,#1a2b4a,#2d5080);display:none;align-items:center;justify-content:center;z-index:999;padding:20px;}
+.setup-card{background:#fff;border-radius:16px;padding:30px;max-width:520px;width:100%;}
+.setup-card h1{font-size:1.4rem;color:var(--navy);margin-bottom:6px;}
+.setup-card .sub{font-size:0.85rem;color:var(--muted);margin-bottom:20px;line-height:1.5;}
+.setup-steps{counter-reset:step;margin-bottom:20px;}
+.setup-step{display:flex;gap:12px;margin-bottom:14px;align-items:flex-start;}
+.step-num{background:var(--navy);color:#fff;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.78rem;font-weight:700;flex-shrink:0;margin-top:2px;}
+.step-body{flex:1;}
+.step-body strong{font-size:0.88rem;color:var(--navy);display:block;margin-bottom:4px;}
+.step-body p{font-size:0.78rem;color:var(--muted);line-height:1.5;}
+.step-body a{color:var(--sky);font-weight:600;}
+.setup-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.setup-field label{font-size:0.78rem;color:var(--muted);font-weight:600;}
+.setup-field input{padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:0.9rem;font-family:inherit;color:var(--text);}
+.setup-field input:focus{outline:none;border-color:var(--sky);}
+.setup-err{background:#ffeaea;color:var(--danger);padding:8px 12px;border-radius:7px;font-size:0.82rem;margin-bottom:12px;display:none;}
+
+/* LOGIN SCREEN */
+#loginScreen{position:fixed;inset:0;background:linear-gradient(135deg,#1a2b4a,#2d5080);display:flex;align-items:center;justify-content:center;z-index:998;padding:20px;}
+.login-card{background:#fff;border-radius:16px;padding:32px 28px;max-width:400px;width:100%;}
+.login-card h1{font-size:1.3rem;color:var(--navy);margin-bottom:4px;text-align:center;}
+.login-card .sub{font-size:0.8rem;color:var(--muted);margin-bottom:22px;text-align:center;}
+.login-toggle{text-align:center;margin-top:14px;font-size:0.82rem;color:var(--muted);}
+.login-toggle a{color:var(--sky);font-weight:600;cursor:pointer;text-decoration:none;}
+.login-toggle a:hover{text-decoration:underline;}
+.logout-btn{background:transparent;border:1px solid rgba(255,255,255,0.35);color:rgba(255,255,255,0.85);padding:4px 10px;border-radius:6px;font-size:0.72rem;cursor:pointer;margin-left:8px;}
+.logout-btn:hover{background:rgba(255,255,255,0.15);color:#fff;}
+.user-badge{font-size:0.7rem;color:rgba(255,255,255,0.75);margin-left:8px;}
+
+/* NAV */
+nav{background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 14px;height:54px;position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,0.3);}
+nav .brand{font-size:0.95rem;font-weight:700;display:flex;align-items:center;gap:6px;}
+nav .nav-tabs{display:flex;gap:3px;}
+nav .nav-tabs button{background:transparent;border:none;color:rgba(255,255,255,0.75);padding:6px 10px;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:500;transition:all 0.2s;}
+nav .nav-tabs button:hover{background:rgba(255,255,255,0.15);color:#fff;}
+nav .nav-tabs button.active{background:var(--saffron);color:#fff;}
+.sync-badge{font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700;cursor:pointer;}
+.sync-ok{background:#1a4a2e;color:#6effa0;}
+.sync-off{background:#4a1a1a;color:#ff9090;}
+.sync-ing{background:#3a3a1a;color:#ffe090;}
+
+.page{display:none;max-width:1100px;margin:0 auto;padding:18px 14px;}
+.page.active{display:block;}
+
+/* IMPORT BAR */
+.import-bar{background:linear-gradient(135deg,#1a2b4a,#2d5080);border-radius:10px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;}
+.import-bar .ib-left{flex:1;min-width:160px;}
+.import-bar .ib-title{color:#fff;font-weight:700;font-size:0.9rem;}
+.import-bar .ib-hint{color:rgba(255,255,255,0.6);font-size:0.73rem;margin-top:2px;}
+.import-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.drop-zone{border:2px dashed rgba(255,255,255,0.4);border-radius:8px;padding:8px 14px;color:rgba(255,255,255,0.85);font-size:0.8rem;cursor:pointer;transition:all 0.2s;text-align:center;}
+.drop-zone:hover,.drop-zone.drag{border-color:#fff;background:rgba(255,255,255,0.12);}
+
+/* DASH */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px;}
+.stat-card{background:var(--card);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(26,43,74,0.08);border-left:4px solid var(--sky);}
+.stat-card.green{border-color:var(--green);}
+.stat-card.saffron{border-color:var(--saffron);}
+.stat-card.danger{border-color:var(--danger);}
+.stat-val{font-size:1.9rem;font-weight:800;color:var(--navy);}
+.stat-icon{font-size:1.4rem;margin-bottom:4px;}
+.stat-label{font-size:0.72rem;color:var(--muted);margin-top:3px;text-transform:uppercase;letter-spacing:0.4px;}
+.dash-lists{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:580px){.dash-lists{grid-template-columns:1fr;}}
+.dash-list-card{background:var(--card);border-radius:10px;padding:14px;box-shadow:0 2px 6px rgba(26,43,74,0.06);}
+.dash-list-card h3{font-size:0.88rem;color:var(--navy-mid);margin-bottom:10px;font-weight:700;}
+.mini-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);}
+.mini-row:last-child{border-bottom:none;}
+.mini-avatar{width:30px;height:30px;border-radius:50%;overflow:hidden;background:var(--light);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:0.95rem;color:var(--muted);flex-shrink:0;}
+.mini-avatar img{width:30px;height:30px;object-fit:cover;}
+.mini-name{font-size:0.83rem;font-weight:600;}
+.mini-sub{font-size:0.7rem;color:var(--muted);}
+
+/* FORM */
+.form-card{background:var(--card);border-radius:12px;padding:18px;margin-bottom:20px;box-shadow:0 2px 8px rgba(26,43,74,0.08);}
+.form-card h2{font-size:0.96rem;font-weight:700;color:var(--navy);margin-bottom:12px;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin-bottom:10px;}
+label.field{display:flex;flex-direction:column;gap:3px;font-size:0.76rem;color:var(--muted);font-weight:600;}
+label.field input,label.field textarea{font-size:0.88rem;padding:8px 10px;border:1.5px solid var(--border);border-radius:7px;color:var(--text);background:#fff;font-family:inherit;transition:border 0.2s;}
+label.field input:focus,label.field textarea:focus{outline:none;border-color:var(--sky);}
+label.field textarea{resize:vertical;min-height:54px;}
+.photo-row{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
+.photo-box{width:82px;height:82px;border:2px dashed var(--border);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--light);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:3px;font-size:0.65rem;color:var(--muted);flex-shrink:0;text-align:center;transition:border 0.2s;}
+.photo-box:hover{border-color:var(--sky);}
+.photo-box img{width:82px;height:82px;object-fit:cover;}
+.gps-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.gps-display{font-size:0.76rem;color:var(--green);font-weight:600;background:#eafaf1;padding:4px 9px;border-radius:5px;}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:8px 13px;border:none;border-radius:7px;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s;font-family:inherit;}
+.btn-primary{background:var(--navy);color:#fff;} .btn-primary:hover{background:var(--navy-mid);}
+.btn-green{background:var(--green);color:#fff;} .btn-green:hover{background:#256040;}
+.btn-saffron{background:var(--saffron);color:#fff;} .btn-saffron:hover{background:#c57510;}
+.btn-danger{background:var(--danger);color:#fff;} .btn-danger:hover{background:#a82a1e;}
+.btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--border);} .btn-ghost:hover{background:var(--light);}
+.btn-sm{padding:5px 9px;font-size:0.76rem;}
+.btn-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;}
+
+.controls-bar{display:flex;gap:9px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+.controls-bar input,.controls-bar select{font-size:0.86rem;padding:7px 10px;border:1.5px solid var(--border);border-radius:7px;background:#fff;color:var(--text);flex:1;min-width:110px;font-family:inherit;}
+.controls-bar input:focus,.controls-bar select:focus{outline:none;border-color:var(--sky);}
+.count-text{font-size:0.78rem;color:var(--muted);margin-bottom:8px;}
+.section-title{font-size:1.05rem;font-weight:700;color:var(--navy);margin:20px 0 10px;}
+
+.record-list{display:flex;flex-direction:column;gap:9px;}
+.record-card{background:var(--card);border-radius:10px;padding:11px 13px;display:flex;align-items:center;gap:11px;box-shadow:0 1px 5px rgba(26,43,74,0.07);flex-wrap:wrap;}
+.record-photo{width:46px;height:46px;border-radius:50%;overflow:hidden;background:var(--light);border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.3rem;color:var(--muted);}
+.record-photo img{width:46px;height:46px;object-fit:cover;}
+.record-info{flex:1;min-width:0;}
+.record-name{font-size:0.93rem;font-weight:700;color:var(--navy);}
+.record-meta{font-size:0.76rem;color:var(--muted);margin-top:2px;}
+.tag{display:inline-block;background:var(--navy);color:#fff;font-size:0.68rem;padding:1px 7px;border-radius:10px;margin-right:3px;margin-top:2px;}
+.tag.green{background:var(--green);} .tag.sky{background:var(--sky);} .tag.saffron{background:var(--saffron);}
+.record-actions{display:flex;gap:4px;flex-wrap:wrap;}
+.empty-state{text-align:center;padding:36px 20px;color:var(--muted);}
+.empty-icon{font-size:2.2rem;margin-bottom:8px;}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:center;justify-content:center;}
+.modal-bg.open{display:flex;}
+.modal{background:#fff;border-radius:14px;padding:20px;max-width:450px;width:92%;max-height:90vh;overflow-y:auto;}
+.modal h2{font-size:1rem;font-weight:700;color:var(--navy);margin-bottom:12px;}
+.modal-close{float:right;background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--muted);}
+.vf-label{font-size:0.71rem;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:0.4px;}
+.vf-val{font-size:0.9rem;color:var(--text);margin-top:1px;margin-bottom:8px;}
+.view-photo{width:76px;height:76px;border-radius:10px;object-fit:cover;border:2px solid var(--border);margin-bottom:12px;}
+.template-table{width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:8px;}
+.template-table th{background:var(--navy);color:#fff;padding:5px 7px;text-align:left;}
+.template-table td{padding:4px 7px;border:1px solid var(--border);color:var(--muted);}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--navy);color:#fff;padding:9px 18px;border-radius:30px;font-size:0.86rem;z-index:300;transition:transform 0.3s;pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* LOADING */
+#loadingOverlay{display:none;position:fixed;inset:0;background:rgba(255,255,255,0.75);z-index:400;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+#loadingOverlay.show{display:flex;}
+.spinner{width:36px;height:36px;border:4px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+#loadingMsg{color:var(--navy);font-weight:600;font-size:0.88rem;}
+</style>
+</head>
+<body>
+
+<!-- ========== LOGIN SCREEN ========== -->
+<div id="loginScreen">
+  <div class="login-card">
+    <h1>🏫 विद्यालय प्रबंधन</h1>
+    <p class="sub">संकुल मुंगवानी • जिला सिवनी (म.प्र.)<br>कृपया अपनी आईडी (ईमेल) और पासवर्ड से लॉगिन करें</p>
+    <div id="loginErr" class="setup-err"></div>
+    <div class="setup-field">
+      <label>यूजर आईडी (ईमेल)</label>
+      <input type="email" id="login-email" placeholder="jaise: teacher1@school.com">
+    </div>
+    <div class="setup-field">
+      <label>पासवर्ड</label>
+      <input type="password" id="login-pass" placeholder="कम से कम 6 अक्षर">
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px;" id="loginBtn" onclick="loginUser()">🔓 लॉगिन करें</button>
+    <script>document.getElementById('login-pass') && document.getElementById('login-pass').addEventListener('keydown', e => { if(e.key==='Enter') loginUser(); });</script>
+    <div class="login-toggle" id="loginToggleText">
+      नया यूजर हैं? <a onclick="toggleAuthMode()">यहाँ रजिस्टर करें</a>
+    </div>
+  </div>
+</div>
+
+<!-- ========== MAIN APP ========== -->
+<div id="appMain" style="display:none;">
+<nav>
+  <div class="brand"><div>🏫 विद्यालय प्रबंधन</div><div style="font-size:0.62rem;font-weight:400;color:rgba(255,255,255,0.7);line-height:1.2;">संकुल मुंगवानी • जिला सिवनी (म.प्र.)</div></div>
+  <div class="nav-tabs">
+    <button class="active" onclick="showPage('dashboard')">🏠 Dashboard</button>
+    <button onclick="showPage('students')">👨‍🎓 Students</button>
+    <button onclick="showPage('teachers')">👨‍🏫 Teachers</button>
+    <button onclick="showPage('schools')">🏫 Schools</button>
+  </div>
+  <div style="display:flex;align-items:center;">
+    <span class="sync-badge sync-ing" id="syncBadge" onclick="showSyncInfo()" title="Click for info">⟳ Connecting</span>
+    <span class="user-badge" id="userBadge"></span>
+    <button class="logout-btn" onclick="logoutUser()">🚪 Logout</button>
+  </div>
+</nav>
+
+<div id="loadingOverlay"><div class="spinner"></div><div id="loadingMsg">Loading...</div></div>
+<div class="toast" id="toast"></div>
+
+<!-- ========== DASHBOARD ========== -->
+<div class="page active" id="page-dashboard">
+  <div class="dash-grid">
+    <div class="stat-card green"><div class="stat-icon">👨‍🎓</div><div class="stat-val" id="ds-students">0</div><div class="stat-label">कुल छात्र</div></div>
+    <div class="stat-card saffron"><div class="stat-icon">👨‍🏫</div><div class="stat-val" id="ds-teachers">0</div><div class="stat-label">कुल शिक्षक</div></div>
+    <div class="stat-card"><div class="stat-icon">🏫</div><div class="stat-val" id="ds-total">0</div><div class="stat-label">कुल स्कूल</div></div>
+  </div>
+  <div class="dash-lists">
+    <div class="dash-list-card"><h3>📋 हाल के छात्र</h3><div id="dash-s-list"></div></div>
+    <div class="dash-list-card"><h3>📋 शिक्षक सूची</h3><div id="dash-t-list"></div></div>
+  </div>
+</div>
+
+<!-- ========== STUDENTS ========== -->
+<div class="page" id="page-students">
+  <div class="import-bar">
+    <div class="ib-left">
+      <div class="ib-title">📥 Excel से Import करें</div>
+      <div class="ib-hint">तैयार Excel/CSV upload करें — सभी students एक साथ जुड़ेंगे</div>
+    </div>
+    <div class="import-actions">
+      <div class="drop-zone" onclick="document.getElementById('sImportFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'students')">📂 Excel/CSV Drop करें</div>
+      <input type="file" id="sImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event,'students')">
+      <button class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.4);" onclick="downloadTemplate('students')">⬇ Template</button>
+    </div>
+  </div>
+
+  <div class="form-card" id="studentFormCard">
+    <h2 id="studentFormTitle">➕ नया छात्र जोड़ें</h2>
+    <div class="photo-row">
+      <div class="photo-box" onclick="document.getElementById('photoInput').click()" id="photoBox"><span>📷</span><span>फ़ोटो</span></div>
+      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhoto(event)">
+      <div style="flex:1;">
+        <div class="form-grid">
+          <label class="field">छात्र का नाम *<input type="text" id="s-name" placeholder="पूरा नाम"></label>
+          <label class="field">पिता का नाम<input type="text" id="s-father" placeholder="पिता का नाम"></label>
+          <label class="field">Roll No. *<input type="text" id="s-roll" placeholder="Roll Number"></label>
+          <label class="field">कक्षा *<input type="text" id="s-class" placeholder="जैसे: 5-A"></label>
+          <label class="field">जन्म तिथि<input type="text" id="s-dob" placeholder="DD/MM/YYYY"></label>
+          <label class="field">संपर्क नंबर<input type="text" id="s-contact" placeholder="मोबाइल नंबर"></label>
+          <label class="field">Blood Group<input type="text" id="s-blood" placeholder="A+, B-..."></label>
+        </div>
+        <label class="field" style="margin-bottom:10px;">पता<textarea id="s-address" placeholder="घर का पूरा पता"></textarea></label>
+        <div class="gps-row">
+          <button class="btn btn-green btn-sm" onclick="getGPS()">📍 घर का Location लें</button>
+          <span id="gpsDisplay" class="gps-display" style="display:none;"></span>
+        </div>
+        <input type="hidden" id="s-lat"><input type="hidden" id="s-lng">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveStudent()" id="saveStudentBtn">💾 Save Student</button>
+      <button class="btn btn-ghost" onclick="resetStudentForm()">✖ Clear</button>
+    </div>
+  </div>
+
+  <div class="section-title">👨‍🎓 छात्र रिकॉर्ड</div>
+  <div class="controls-bar">
+    <input type="search" id="s-search" placeholder="नाम, Roll No., मोबाइल, पता से खोजें..." oninput="renderStudents()">
+    <select id="s-filterClass" onchange="renderStudents()"><option value="">सभी कक्षाएँ</option></select>
+    <button class="btn btn-green btn-sm" onclick="exportStudentsExcel()">📊 Excel</button>
+    <button class="btn btn-saffron btn-sm" onclick="exportStudentsPDF()">📄 PDF</button>
+  </div>
+  <div class="count-text" id="s-count"></div>
+  <div class="record-list" id="studentList"></div>
+</div>
+
+<!-- ========== TEACHERS ========== -->
+<div class="page" id="page-teachers">
+  <div class="import-bar">
+    <div class="ib-left">
+      <div class="ib-title">📥 Excel से Import करें</div>
+      <div class="ib-hint">Teacher Excel/CSV upload करें</div>
+    </div>
+    <div class="import-actions">
+      <div class="drop-zone" onclick="document.getElementById('tImportFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'teachers')">📂 Excel/CSV Drop करें</div>
+      <input type="file" id="tImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event,'teachers')">
+      <button class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.4);" onclick="downloadTemplate('teachers')">⬇ Template</button>
+    </div>
+  </div>
+  <div class="form-card">
+    <h2 id="teacherFormTitle">➕ नए शिक्षक जोड़ें</h2>
+    <div class="photo-row">
+      <div class="photo-box" onclick="document.getElementById('tPhotoInput').click()" id="tPhotoBox"><span>📷</span><span>फ़ोटो</span></div>
+      <input type="file" id="tPhotoInput" accept="image/*" style="display:none" onchange="handleTPhoto(event)">
+      <div style="flex:1;">
+        <div class="form-grid">
+          <label class="field">शिक्षक का नाम *<input type="text" id="t-name" placeholder="पूरा नाम"></label>
+          <label class="field">Employee ID<input type="text" id="t-empid" placeholder="EMP001"></label>
+          <label class="field">विषय<input type="text" id="t-subject" placeholder="गणित, विज्ञान..."></label>
+          <label class="field">कक्षा प्रभारी<input type="text" id="t-class" placeholder="5-A, 6-B..."></label>
+          <label class="field">संपर्क<input type="text" id="t-contact" placeholder="मोबाइल नंबर"></label>
+          <label class="field">Qualification<input type="text" id="t-qual" placeholder="B.Ed, M.Sc..."></label>
+          <label class="field">अनुभव (वर्ष)<input type="text" id="t-exp" placeholder="जैसे: 5"></label>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveTeacher()" id="saveTeacherBtn">💾 Save Teacher</button>
+      <button class="btn btn-ghost" onclick="resetTeacherForm()">✖ Clear</button>
+    </div>
+  </div>
+  <div class="section-title">👨‍🏫 शिक्षक रिकॉर्ड</div>
+  <div class="controls-bar">
+    <input type="search" id="t-search" placeholder="नाम या विषय से खोजें..." oninput="renderTeachers()">
+    <button class="btn btn-green btn-sm" onclick="exportTeachersExcel()">📊 Excel</button>
+    <button class="btn btn-saffron btn-sm" onclick="exportTeachersPDF()">📄 PDF</button>
+  </div>
+  <div class="count-text" id="t-count"></div>
+  <div class="record-list" id="teacherList"></div>
+</div>
+
+
+<!-- ========== SCHOOLS ========== -->
+<div class="page" id="page-schools">
+  <div class="import-bar">
+    <div class="ib-left">
+      <div class="ib-title">📥 Excel से Import करें</div>
+      <div class="ib-hint">स्कूल Excel/CSV upload करें — सभी स्कूल एक साथ जुड़ेंगे</div>
+    </div>
+    <div class="import-actions">
+      <div class="drop-zone" onclick="document.getElementById('schImportFile').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event,'schools')">📂 Excel/CSV Drop करें</div>
+      <input type="file" id="schImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="importExcel(event,'schools')">
+      <button class="btn btn-ghost" style="color:#fff;border-color:rgba(255,255,255,0.4);" onclick="downloadTemplate('schools')">⬇ Template</button>
+    </div>
+  </div>
+  <div class="form-card" id="schoolFormCard">
+    <h2 id="schoolFormTitle">➕ नया स्कूल जोड़ें</h2>
+    <div class="photo-row">
+      <div class="photo-box" onclick="document.getElementById('schPhotoInput').click()" id="schPhotoBox"><span>📷</span><span>फ़ोटो</span></div>
+      <input type="file" id="schPhotoInput" accept="image/*" style="display:none" onchange="handleSchPhoto(event)">
+      <div style="flex:1;">
+        <div class="form-grid">
+          <label class="field">स्कूल का नाम *<input type="text" id="sch-name" placeholder="जैसे: शासकीय प्राथमिक विद्यालय"></label>
+          <label class="field">UDISE कोड<input type="text" id="sch-udise" placeholder="UDISE नंबर"></label>
+          <label class="field">प्रधानाध्यापक<input type="text" id="sch-head" placeholder="प्रधानाध्यापक का नाम"></label>
+          <label class="field">संपर्क नंबर<input type="text" id="sch-contact" placeholder="मोबाइल नंबर"></label>
+          <label class="field">स्थापना वर्ष<input type="text" id="sch-year" placeholder="जैसे: 1985"></label>
+          <label class="field">माध्यम<input type="text" id="sch-medium" placeholder="हिंदी, अंग्रेजी..."></label>
+          <label class="field">कक्षाएँ<input type="text" id="sch-classes" placeholder="जैसे: 1 से 5, 1 से 8..."></label>
+          <label class="field">प्रकार<input type="text" id="sch-type" placeholder="सरकारी / प्राइवेट"></label>
+        </div>
+        <label class="field" style="margin-bottom:10px;">पता / ग्राम<textarea id="sch-address" placeholder="स्कूल का पूरा पता या ग्राम का नाम"></textarea></label>
+        <div class="gps-row">
+          <button class="btn btn-green btn-sm" onclick="getSchGPS()">📍 स्कूल का Location लें</button>
+          <span id="schGpsDisplay" class="gps-display" style="display:none;"></span>
+        </div>
+        <input type="hidden" id="sch-lat"><input type="hidden" id="sch-lng">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="saveSchool()" id="saveSchoolBtn">💾 Save School</button>
+      <button class="btn btn-ghost" onclick="resetSchoolForm()">✖ Clear</button>
+    </div>
+  </div>
+
+  <div class="section-title">🏫 स्कूल रिकॉर्ड</div>
+  <div class="controls-bar">
+    <input type="search" id="sch-search" placeholder="नाम, UDISE, पता से खोजें..." oninput="renderSchools()">
+    <select id="sch-filterType" onchange="renderSchools()"><option value="">सभी प्रकार</option><option value="सरकारी">सरकारी</option><option value="प्राइवेट">प्राइवेट</option></select>
+    <button class="btn btn-green btn-sm" onclick="exportSchoolsExcel()">📊 Excel</button>
+    <button class="btn btn-saffron btn-sm" onclick="exportSchoolsPDF()">📄 PDF</button>
+  </div>
+  <div class="count-text" id="sch-count"></div>
+  <div class="record-list" id="schoolList"></div>
+</div>
+</div><!-- /#appMain -->
+
+<!-- VIEW MODAL -->
+<div class="modal-bg" id="viewModal">
+  <div class="modal"><button class="modal-close" onclick="closeModal('viewModal')">✕</button><div id="modalContent"></div></div>
+</div>
+
+<!-- IMPORT PREVIEW MODAL -->
+<div class="modal-bg" id="importModal">
+  <div class="modal" style="max-width:580px;">
+    <button class="modal-close" onclick="closeModal('importModal')">✕</button>
+    <h2 id="importModalTitle">Import Preview</h2>
+    <div id="importPreview"></div>
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-green" id="importConfirmBtn">✅ सभी Import करें</button>
+      <button class="btn btn-ghost" onclick="closeModal('importModal')">रद्द करें</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  FIREBASE CONNECTION
+// ============================================================
+let db = null;
+let students = {};   // keyed by Firebase push ID
+let teachers = {};
+let editStudentKey = null;
+let schools = {};
+let editSchoolKey = null;
+let currentSchPhotoB64 = '';
+let editTeacherKey = null;
+let currentPhotoB64 = '';
+let currentTPhotoB64 = '';
+let pendingImport = null;
+
+// Hardcoded Firebase config — no setup needed for any user
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCxmNZzdZv_4Yw3jbGgWrJEREcedZCvpms",
+  authDomain: "school-58480.firebaseapp.com",
+  databaseURL: "https://school-58480-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "school-58480",
+  storageBucket: "school-58480.firebasestorage.app",
+  messagingSenderId: "380359755933",
+  appId: "1:380359755933:web:3ca8e45739ca70aa0c6c74",
+  measurementId: "G-DNP3SLC093"
+};
+
+function getSavedConfig() {
+  return FIREBASE_CONFIG;
+}
+
+function connectFirebase() {
+  // Not needed anymore — config is hardcoded
+  initFirebase(FIREBASE_CONFIG);
+}
+
+function initFirebase(cfg) {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    db = firebase.database();
+    setBadge('ing','⟳ Connecting');
+    initAuth();
+  } catch(e) {
+    const errBox = document.getElementById('loginErr');
+    if (errBox) { errBox.textContent = 'Firebase error: ' + e.message; errBox.style.display = 'block'; }
+  }
+}
+
+// ============================================================
+//  AUTHENTICATION (ID / Password लॉगिन)
+// ============================================================
+let authMode = 'login'; // 'login' या 'register'
+
+function initAuth() {
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('appMain').style.display = 'block';
+      document.getElementById('userBadge').textContent = '👤 ' + user.email;
+      attachListeners();
+    } else {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('appMain').style.display = 'none';
+    }
+  });
+}
+
+function toggleAuthMode() {
+  authMode = authMode === 'login' ? 'register' : 'login';
+  document.getElementById('loginErr').style.display = 'none';
+  if (authMode === 'register') {
+    document.getElementById('loginBtn').textContent = '🆕 अकाउंट बनाएं और शुरू करें';
+    document.getElementById('loginToggleText').innerHTML = 'पहले से अकाउंट है? <a onclick="toggleAuthMode()">यहाँ लॉगिन करें</a>';
+  } else {
+    document.getElementById('loginBtn').textContent = '🔓 लॉगिन करें';
+    document.getElementById('loginToggleText').innerHTML = 'नया यूजर हैं? <a onclick="toggleAuthMode()">यहाँ रजिस्टर करें</a>';
+  }
+}
+
+function loginUser() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errBox = document.getElementById('loginErr');
+  errBox.style.display = 'none';
+  if (!email || !pass) {
+    errBox.textContent = 'कृपया आईडी (ईमेल) और पासवर्ड दोनों भरें।';
+    errBox.style.display = 'block';
+    return;
+  }
+  const action = authMode === 'register'
+    ? firebase.auth().createUserWithEmailAndPassword(email, pass)
+    : firebase.auth().signInWithEmailAndPassword(email, pass);
+
+  action.catch(e => {
+    errBox.textContent = authErrorMessage(e);
+    errBox.style.display = 'block';
+  });
+}
+
+function authErrorMessage(e) {
+  const map = {
+    'auth/invalid-email': 'ईमेल फॉर्मेट सही नहीं है।',
+    'auth/user-not-found': 'यह आईडी रजिस्टर नहीं है। नया अकाउंट बनाएं।',
+    'auth/wrong-password': 'पासवर्ड गलत है।',
+    'auth/email-already-in-use': 'यह आईडी पहले से रजिस्टर है। लॉगिन करें।',
+    'auth/weak-password': 'पासवर्ड कम से कम 6 अक्षर का होना चाहिए।',
+    'auth/invalid-credential': 'आईडी या पासवर्ड गलत है।'
+  };
+  return map[e.code] || ('Error: ' + e.message);
+}
+
+function logoutUser() {
+  firebase.auth().signOut();
+}
+
+function attachListeners() {
+  // Students real-time listener
+  db.ref('students').on('value', snap => {
+    students = snap.val() || {};
+    renderStudents();
+    renderDashboard();
+    setBadge('ok','✓ Live');
+  }, err => setBadge('off','✗ Error'));
+
+  // Teachers real-time listener
+  db.ref('teachers').on('value', snap => {
+    teachers = snap.val() || {};
+    renderTeachers();
+    renderDashboard();
+  }, err => {});
+
+  // Schools real-time listener
+  db.ref('schools').on('value', snap => {
+    schools = snap.val() || {};
+    renderSchools();
+    renderDashboard();
+  }, err => {});
+}
+
+function setBadge(state, text) {
+  const b = document.getElementById('syncBadge');
+  b.textContent = text;
+  b.className = 'sync-badge ' + (state==='ok'?'sync-ok':state==='off'?'sync-off':'sync-ing');
+}
+
+function showSyncInfo() {
+  showToast('Firebase real-time sync active — सभी users का data live update होता है।');
+}
+
+// ============================================================
+//  NAVIGATION
+// ============================================================
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('.nav-tabs button').forEach(el=>el.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  ['dashboard','students','teachers','schools'].forEach((n,i)=>{
+    if(n===p) document.querySelectorAll('.nav-tabs button')[i].classList.add('active');
+  });
+}
+
+// ============================================================
+//  TOAST / LOADING
+// ============================================================
+function showToast(msg) {
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+function showL(m){document.getElementById('loadingMsg').textContent=m; document.getElementById('loadingOverlay').classList.add('show');}
+function hideL(){document.getElementById('loadingOverlay').classList.remove('show');}
+
+// ============================================================
+//  PHOTO COMPRESS
+// ============================================================
+function compressImage(file, cb) {
+  const r=new FileReader(); r.onload=e=>{
+    const img=new Image(); img.onload=()=>{
+      const c=document.createElement('canvas'), max=200;
+      let w=img.width,h=img.height;
+      if(w>h){if(w>max){h=h*(max/w);w=max;}}else{if(h>max){w=w*(max/h);h=max;}}
+      c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h);
+      cb(c.toDataURL('image/jpeg',0.7));
+    }; img.src=e.target.result;
+  }; r.readAsDataURL(file);
+}
+function handlePhoto(e){const f=e.target.files[0];if(!f)return;compressImage(f,b=>{currentPhotoB64=b;document.getElementById('photoBox').innerHTML=`<img src="${b}">`});}
+function handleTPhoto(e){const f=e.target.files[0];if(!f)return;compressImage(f,b=>{currentTPhotoB64=b;document.getElementById('tPhotoBox').innerHTML=`<img src="${b}">`});}
+
+// ============================================================
+//  GPS
+// ============================================================
+function getGPS() {
+  if(!navigator.geolocation){showToast('Browser location support नहीं है');return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const lat=pos.coords.latitude.toFixed(6), lng=pos.coords.longitude.toFixed(6);
+    document.getElementById('s-lat').value=lat; document.getElementById('s-lng').value=lng;
+    const d=document.getElementById('gpsDisplay'); d.style.display='inline-block'; d.textContent=`📍 ${lat}, ${lng}`;
+    showToast('Location मिल गई!');
+  },()=>showToast('Location नहीं मिली।'));
+}
+
+// ============================================================
+//  EXCEL IMPORT
+// ============================================================
+const SCHOOL_MAP={naam:['naam','name','school name','स्कूल नाम','नाम','school'],udise:['udise','udise code','udise no','udise कोड'],mukhya:['mukhya','head','headmaster','प्रधानाध्यापक','principal'],samparak:['samparak','contact','mobile','phone','संपर्क'],sthapna:['sthapna','year','established','स्थापना','स्थापना वर्ष'],madhyam:['madhyam','medium','माध्यम'],kaksha:['kaksha','classes','कक्षाएँ'],prakar:['prakar','type','प्रकार'],pata:['pata','address','पता'],lat:['lat','latitude'],lng:['lng','longitude']};
+const STUDENT_MAP={naam:['naam','name','छात्र नाम','नाम','student name'],pita:['pita','father','father name','पिता','पिता का नाम'],roll:['roll','roll no','roll no.','roll number','रोल'],kaksha:['kaksha','class','कक्षा'],janm:['janm','dob','date of birth','जन्म'],samparak:['samparak','contact','mobile','phone','संपर्क'],blood:['blood','blood group','ब्लड'],pata:['pata','address','पता'],lat:['lat','latitude'],lng:['lng','longitude']};
+const TEACHER_MAP={naam:['naam','name','शिक्षक का नाम','नाम'],empid:['empid','employee id','emp id','id'],vishay:['vishay','subject','विषय'],kaksha:['kaksha','class','कक्षा'],samparak:['samparak','contact','mobile','संपर्क'],yogyata:['yogyata','qualification','qual'],anubhav:['anubhav','experience','exp','अनुभव']};
+
+function findCol(headers,aliases){for(const a of aliases){const i=headers.findIndex(h=>h&&h.toString().toLowerCase().trim()===a.toLowerCase());if(i!==-1)return i;}return -1;}
+function handleDrop(e,type){e.preventDefault();e.currentTarget.classList.remove('drag');const f=e.dataTransfer.files[0];if(f)processFile(f,type);}
+function importExcelSchool(e){const f=e.target.files[0];if(f)processFile(f,'schools');e.target.value='';}
+function importExcel(e,type){const f=e.target.files[0];if(f)processFile(f,type);e.target.value='';}
+
+function processFile(file,type) {
+  showL('File पढ़ी जा रही है...');
+  const r=new FileReader(); r.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''});
+      hideL();
+      if(rows.length<2){showToast('File खाली है।');return;}
+      showImportPreview(rows,type);
+    }catch(err){hideL();showToast('Error: '+err.message);}
+  }; r.readAsArrayBuffer(file);
+}
+
+function showImportPreview(rows,type) {
+  const headers=rows[0].map(h=>h?h.toString():'');
+  const map=type==='students'?STUDENT_MAP:type==='teachers'?TEACHER_MAP:SCHOOL_MAP;
+  const colIdx={};
+  for(const[f,al]of Object.entries(map)) colIdx[f]=findCol(headers,al);
+  const parsed=rows.slice(1).filter(r=>r.some(c=>c!=='')).map(row=>{
+    const obj={};
+    for(const[f,idx]of Object.entries(colIdx)) obj[f]=idx!==-1?(row[idx]||'').toString().trim():'';
+    return obj;
+  });
+  document.getElementById('importModalTitle').textContent=`${type==='students'?'👨‍🎓':type==='teachers'?'👨‍🏫':'🏫'} Import Preview — ${parsed.length} rows`;
+  document.getElementById('importPreview').innerHTML=`
+    <p style="font-size:0.78rem;color:var(--muted);margin-bottom:8px;">पहले 5 rows का preview:</p>
+    <div style="overflow-x:auto;"><table class="template-table">
+      <tr>${Object.keys(map).map(k=>`<th>${k}</th>`).join('')}</tr>
+      ${parsed.slice(0,5).map(r=>`<tr>${Object.keys(map).map(k=>`<td>${escH(r[k]||'-')}</td>`).join('')}</tr>`).join('')}
+    </table></div>
+    ${parsed.length>5?`<p style="font-size:0.76rem;color:var(--muted);margin-top:5px;">...और ${parsed.length-5} rows</p>`:''}
+  `;
+  pendingImport={parsed,type};
+  document.getElementById('importConfirmBtn').onclick=confirmImport;
+  document.getElementById('importModal').classList.add('open');
+}
+
+async function confirmImport() {
+  if(!db){showToast('Firebase connected नहीं है।');return;}
+  const {parsed,type}=pendingImport;
+  closeModal('importModal');
+  showL(`${parsed.length} records save हो रहे हैं...`);
+  let count=0;
+  const ref=db.ref(type==='students'?'students':type==='teachers'?'teachers':'schools');
+  for(const r of parsed){
+    if(!r.naam) continue;
+    const obj=type==='students'?{name:r.naam,father:r.pita,roll:r.roll,cls:r.kaksha,dob:r.janm,contact:r.samparak,blood:r.blood,address:r.pata,lat:r.lat||'',lng:r.lng||'',photo:'',addedOn:new Date().toLocaleDateString('hi-IN')}:type==='teachers'?{name:r.naam,empid:r.empid,subject:r.vishay,cls:r.kaksha,contact:r.samparak,qual:r.yogyata,exp:r.anubhav,photo:'',addedOn:new Date().toLocaleDateString('hi-IN')}:{name:r.naam,udise:r.udise,head:r.mukhya,contact:r.samparak,year:r.sthapna,medium:r.madhyam,classes:r.kaksha,type:r.prakar,address:r.pata,lat:r.lat||'',lng:r.lng||'',photo:'',addedOn:new Date().toLocaleDateString('hi-IN')};
+    await ref.push(obj);
+    count++;
+  }
+  hideL(); showToast(`✅ ${count} records import हुए!`);
+  pendingImport=null;
+}
+
+function downloadTemplate(type) {
+  if(type==='students'){
+    const ws=XLSX.utils.aoa_to_sheet([['naam','pita','roll','kaksha','janm','samparak','blood','pata','lat','lng'],['Ramesh Kumar','Suresh Kumar','001','5-A','01/01/2015','9876543210','B+','Ward 5 Gali 2','22.123456','82.654321']]);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Students'); XLSX.writeFile(wb,'Student_Template.xlsx');
+  } else if(type==='teachers'){
+    const ws=XLSX.utils.aoa_to_sheet([['naam','empid','vishay','kaksha','samparak','yogyata','anubhav'],['Priya Singh','EMP001','Maths','5-A','9876543210','B.Ed','5']]);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Teachers'); XLSX.writeFile(wb,'Teacher_Template.xlsx');
+  } else {
+    const ws=XLSX.utils.aoa_to_sheet([['naam','udise','mukhya','samparak','sthapna','madhyam','kaksha','prakar','pata','lat','lng'],['शासकीय प्राथमिक विद्यालय मुंगवानी','23456789012','रामलाल यादव','9876543210','1985','हिंदी','1 से 5','सरकारी','ग्राम मुंगवानी जिला सिवनी','22.123456','80.654321']]);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Schools'); XLSX.writeFile(wb,'School_Template.xlsx');
+  }
+  showToast('Template download हो रही है!');
+}
+
+// ============================================================
+//  STUDENTS CRUD
+// ============================================================
+function saveStudent() {
+  if(!db){showToast('Firebase connected नहीं है।');return;}
+  const name=document.getElementById('s-name').value.trim();
+  const roll=document.getElementById('s-roll').value.trim();
+  const cls=document.getElementById('s-class').value.trim();
+  if(!name||!roll||!cls){showToast('नाम, Roll No. और Class जरूरी हैं।');return;}
+  const s={name,father:document.getElementById('s-father').value.trim(),roll,cls,dob:document.getElementById('s-dob').value.trim(),contact:document.getElementById('s-contact').value.trim(),blood:document.getElementById('s-blood').value.trim(),address:document.getElementById('s-address').value.trim(),lat:document.getElementById('s-lat').value,lng:document.getElementById('s-lng').value,photo:currentPhotoB64,addedOn:new Date().toLocaleDateString('hi-IN')};
+  showL('Save हो रहा है...');
+  const p=editStudentKey?db.ref('students/'+editStudentKey).set(s):db.ref('students').push(s);
+  p.then(()=>{hideL();resetStudentForm();showToast('Student सेव हो गया! सभी users को दिख रहा है।');}).catch(e=>{hideL();showToast('Error: '+e.message);});
+}
+
+function resetStudentForm() {
+  ['s-name','s-father','s-roll','s-class','s-dob','s-contact','s-blood','s-address','s-lat','s-lng'].forEach(id=>document.getElementById(id).value='');
+  currentPhotoB64=''; editStudentKey=null;
+  document.getElementById('photoBox').innerHTML='<span>📷</span><span>फ़ोटो</span>';
+  document.getElementById('gpsDisplay').style.display='none';
+  document.getElementById('studentFormTitle').textContent='➕ नया छात्र जोड़ें';
+  document.getElementById('saveStudentBtn').textContent='💾 Save Student';
+}
+
+function editStudent(key) {
+  const s=students[key];
+  document.getElementById('s-name').value=s.name||''; document.getElementById('s-father').value=s.father||'';
+  document.getElementById('s-roll').value=s.roll||''; document.getElementById('s-class').value=s.cls||'';
+  document.getElementById('s-dob').value=s.dob||''; document.getElementById('s-contact').value=s.contact||'';
+  document.getElementById('s-blood').value=s.blood||''; document.getElementById('s-address').value=s.address||'';
+  document.getElementById('s-lat').value=s.lat||''; document.getElementById('s-lng').value=s.lng||'';
+  currentPhotoB64=s.photo||'';
+  document.getElementById('photoBox').innerHTML=s.photo?`<img src="${s.photo}">`:'<span>📷</span><span>फ़ोटो</span>';
+  if(s.lat&&s.lng){const d=document.getElementById('gpsDisplay');d.style.display='inline-block';d.textContent=`📍 ${s.lat}, ${s.lng}`;}
+  editStudentKey=key;
+  document.getElementById('studentFormTitle').textContent='✏ Student अपडेट करें';
+  document.getElementById('saveStudentBtn').textContent='💾 Update Student';
+  document.getElementById('studentFormCard').scrollIntoView({behavior:'smooth'});
+}
+
+function deleteStudent(key) {
+  if(!confirm(`"${students[key].name}" को हटाएं?`)) return;
+  db.ref('students/'+key).remove().then(()=>showToast('हटा दिया गया।')).catch(e=>showToast('Error: '+e.message));
+}
+
+function viewStudent(key) {
+  const s=students[key];
+  const mapsUrl=(s.lat&&s.lng)?`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`:'';
+  document.getElementById('modalContent').innerHTML=`
+    <h2>👨‍🎓 ${escH(s.name)}</h2>
+    ${s.photo?`<img src="${s.photo}" class="view-photo">`:''}
+    <div class="vf-label">Roll No.</div><div class="vf-val">${escH(s.roll)}</div>
+    <div class="vf-label">कक्षा</div><div class="vf-val">${escH(s.cls)}</div>
+    <div class="vf-label">पिता का नाम</div><div class="vf-val">${escH(s.father)||'-'}</div>
+    <div class="vf-label">जन्म तिथि</div><div class="vf-val">${escH(s.dob)||'-'}</div>
+    <div class="vf-label">संपर्क</div><div class="vf-val">${escH(s.contact)||'-'}</div>
+    <div class="vf-label">Blood Group</div><div class="vf-val">${escH(s.blood)||'-'}</div>
+    <div class="vf-label">पता</div><div class="vf-val">${escH(s.address)||'-'}</div>
+    ${s.lat&&s.lng?`<div class="vf-label">GPS</div><div class="vf-val">📍 ${s.lat}, ${s.lng}</div>
+    <a href="${mapsUrl}" target="_blank" class="btn btn-green" style="display:inline-flex;text-decoration:none;margin-top:8px;">🗺 Get Directions</a>`:''}
+  `;
+  document.getElementById('viewModal').classList.add('open');
+}
+
+function renderStudents() {
+  const search=(document.getElementById('s-search')||{}).value||'';
+  const cf=(document.getElementById('s-filterClass')||{}).value||'';
+  const arr=Object.entries(students).map(([k,v])=>({...v,_key:k}));
+  const classes=[...new Set(arr.map(s=>s.cls).filter(Boolean))].sort();
+  const cur=document.getElementById('s-filterClass').value;
+  document.getElementById('s-filterClass').innerHTML='<option value="">सभी कक्षाएँ</option>'+classes.map(c=>`<option value="${c}">${c}</option>`).join('');
+  document.getElementById('s-filterClass').value=cur;
+  const sl=search.toLowerCase();
+  let list=arr.filter(s=>(!sl||(s.name||'').toLowerCase().includes(sl)||(s.roll||'').toLowerCase().includes(sl)||(s.cls||'').toLowerCase().includes(sl)||(s.contact||'').toLowerCase().includes(sl)||(s.address||'').toLowerCase().includes(sl))&&(!cf||s.cls===cf));
+  document.getElementById('s-count').textContent=`कुल ${list.length} छात्र`;
+  const el=document.getElementById('studentList');
+  if(!list.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><p>कोई रिकॉर्ड नहीं। ऊपर फॉर्म या Excel से जोड़ें।</p></div>`;return;}
+  el.innerHTML=list.map(s=>`
+    <div class="record-card">
+      <div class="record-photo">${s.photo?`<img src="${s.photo}">`:'👤'}</div>
+      <div class="record-info">
+        <div class="record-name">${escH(s.name)}</div>
+        <div class="record-meta"><span class="tag sky">Roll ${escH(s.roll)}</span><span class="tag green">Class ${escH(s.cls)}</span>${s.blood?`<span class="tag saffron">${escH(s.blood)}</span>`:''}${s.lat&&s.lng?'<span class="tag">📍GPS</span>':''}</div>
+        <div class="record-meta" style="margin-top:2px;">पिता: ${escH(s.father)||'-'} | 📞 ${escH(s.contact)||'-'}</div>
+      </div>
+      <div class="record-actions">
+        <button class="btn btn-primary btn-sm" onclick="viewStudent('${s._key}')">👁</button>
+        ${s.lat&&s.lng?`<button class="btn btn-green btn-sm" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}','_blank')">🗺</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="editStudent('${s._key}')">✏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteStudent('${s._key}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+//  TEACHERS CRUD
+// ============================================================
+function saveTeacher() {
+  if(!db){showToast('Firebase connected नहीं है।');return;}
+  const name=document.getElementById('t-name').value.trim();
+  if(!name){showToast('शिक्षक का नाम जरूरी है।');return;}
+  const t={name,empid:document.getElementById('t-empid').value.trim(),subject:document.getElementById('t-subject').value.trim(),cls:document.getElementById('t-class').value.trim(),contact:document.getElementById('t-contact').value.trim(),qual:document.getElementById('t-qual').value.trim(),exp:document.getElementById('t-exp').value.trim(),photo:currentTPhotoB64,addedOn:new Date().toLocaleDateString('hi-IN')};
+  showL('Save हो रहा है...');
+  const p=editTeacherKey?db.ref('teachers/'+editTeacherKey).set(t):db.ref('teachers').push(t);
+  p.then(()=>{hideL();resetTeacherForm();showToast('Teacher सेव हो गया!');}).catch(e=>{hideL();showToast('Error: '+e.message);});
+}
+
+function resetTeacherForm() {
+  ['t-name','t-empid','t-subject','t-class','t-contact','t-qual','t-exp'].forEach(id=>document.getElementById(id).value='');
+  currentTPhotoB64=''; editTeacherKey=null;
+  document.getElementById('tPhotoBox').innerHTML='<span>📷</span><span>फ़ोटो</span>';
+  document.getElementById('teacherFormTitle').textContent='➕ नए शिक्षक जोड़ें';
+  document.getElementById('saveTeacherBtn').textContent='💾 Save Teacher';
+}
+
+function editTeacher(key) {
+  const t=teachers[key];
+  document.getElementById('t-name').value=t.name||''; document.getElementById('t-empid').value=t.empid||'';
+  document.getElementById('t-subject').value=t.subject||''; document.getElementById('t-class').value=t.cls||'';
+  document.getElementById('t-contact').value=t.contact||''; document.getElementById('t-qual').value=t.qual||'';
+  document.getElementById('t-exp').value=t.exp||''; currentTPhotoB64=t.photo||'';
+  document.getElementById('tPhotoBox').innerHTML=t.photo?`<img src="${t.photo}">`:'<span>📷</span><span>फ़ोटो</span>';
+  editTeacherKey=key;
+  document.getElementById('teacherFormTitle').textContent='✏ Teacher अपडेट करें';
+  document.getElementById('saveTeacherBtn').textContent='💾 Update Teacher';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteTeacher(key) {
+  if(!confirm(`"${teachers[key].name}" को हटाएं?`)) return;
+  db.ref('teachers/'+key).remove().then(()=>showToast('हटा दिया गया।'));
+}
+
+function viewTeacher(key) {
+  const t=teachers[key];
+  document.getElementById('modalContent').innerHTML=`
+    <h2>👨‍🏫 ${escH(t.name)}</h2>
+    ${t.photo?`<img src="${t.photo}" class="view-photo">`:''}
+    <div class="vf-label">Employee ID</div><div class="vf-val">${escH(t.empid)||'-'}</div>
+    <div class="vf-label">विषय</div><div class="vf-val">${escH(t.subject)||'-'}</div>
+    <div class="vf-label">कक्षा प्रभारी</div><div class="vf-val">${escH(t.cls)||'-'}</div>
+    <div class="vf-label">संपर्क</div><div class="vf-val">${escH(t.contact)||'-'}</div>
+    <div class="vf-label">Qualification</div><div class="vf-val">${escH(t.qual)||'-'}</div>
+    <div class="vf-label">अनुभव</div><div class="vf-val">${escH(t.exp)||'-'} वर्ष</div>
+  `;
+  document.getElementById('viewModal').classList.add('open');
+}
+
+function renderTeachers() {
+  const search=(document.getElementById('t-search').value||'').toLowerCase();
+  const arr=Object.entries(teachers).map(([k,v])=>({...v,_key:k}));
+  const list=arr.filter(t=>!search||(t.name||'').toLowerCase().includes(search)||(t.subject||'').toLowerCase().includes(search));
+  document.getElementById('t-count').textContent=`कुल ${list.length} शिक्षक`;
+  const el=document.getElementById('teacherList');
+  if(!list.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><p>कोई रिकॉर्ड नहीं। ऊपर जोड़ें।</p></div>`;return;}
+  el.innerHTML=list.map(t=>`
+    <div class="record-card">
+      <div class="record-photo">${t.photo?`<img src="${t.photo}">`:'👤'}</div>
+      <div class="record-info">
+        <div class="record-name">${escH(t.name)}</div>
+        <div class="record-meta">${t.empid?`<span class="tag">${escH(t.empid)}</span>`:''} ${t.subject?`<span class="tag saffron">${escH(t.subject)}</span>`:''} ${t.cls?`<span class="tag green">Class ${escH(t.cls)}</span>`:''}</div>
+        <div class="record-meta" style="margin-top:2px;">📞 ${escH(t.contact)||'-'} | ${escH(t.qual)||'-'}</div>
+      </div>
+      <div class="record-actions">
+        <button class="btn btn-primary btn-sm" onclick="viewTeacher('${t._key}')">👁</button>
+        <button class="btn btn-ghost btn-sm" onclick="editTeacher('${t._key}')">✏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTeacher('${t._key}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+
+// ============================================================
+//  SCHOOLS CRUD
+// ============================================================
+function handleSchPhoto(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{currentSchPhotoB64=ev.target.result;document.getElementById('schPhotoBox').innerHTML=`<img src="${ev.target.result}">`};
+  r.readAsDataURL(file);
+}
+
+function getSchGPS() {
+  if(!navigator.geolocation){showToast('GPS support नहीं है।');return;}
+  showToast('Location ले रहे हैं...');
+  navigator.geolocation.getCurrentPosition(pos=>{
+    document.getElementById('sch-lat').value=pos.coords.latitude.toFixed(6);
+    document.getElementById('sch-lng').value=pos.coords.longitude.toFixed(6);
+    const d=document.getElementById('schGpsDisplay');
+    d.style.display='inline';
+    d.textContent=`📍 ${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+    showToast('Location मिल गया!');
+  },()=>showToast('Location नहीं मिला।'));
+}
+
+function saveSchool() {
+  if(!db){showToast('Firebase connected नहीं है।');return;}
+  const name=document.getElementById('sch-name').value.trim();
+  if(!name){showToast('स्कूल का नाम जरूरी है।');return;}
+  const sch={
+    name,
+    udise:document.getElementById('sch-udise').value.trim(),
+    head:document.getElementById('sch-head').value.trim(),
+    contact:document.getElementById('sch-contact').value.trim(),
+    year:document.getElementById('sch-year').value.trim(),
+    medium:document.getElementById('sch-medium').value.trim(),
+    classes:document.getElementById('sch-classes').value.trim(),
+    type:document.getElementById('sch-type').value.trim(),
+    address:document.getElementById('sch-address').value.trim(),
+    lat:document.getElementById('sch-lat').value,
+    lng:document.getElementById('sch-lng').value,
+    photo:currentSchPhotoB64,
+    addedOn:new Date().toLocaleDateString('hi-IN')
+  };
+  showL('Save हो रहा है...');
+  const p=editSchoolKey?db.ref('schools/'+editSchoolKey).set(sch):db.ref('schools').push(sch);
+  p.then(()=>{hideL();resetSchoolForm();showToast('स्कूल सेव हो गया!');}).catch(e=>{hideL();showToast('Error: '+e.message);});
+}
+
+function resetSchoolForm() {
+  ['sch-name','sch-udise','sch-head','sch-contact','sch-year','sch-medium','sch-classes','sch-type','sch-address','sch-lat','sch-lng'].forEach(id=>document.getElementById(id).value='');
+  currentSchPhotoB64=''; editSchoolKey=null;
+  document.getElementById('schPhotoBox').innerHTML='<span>📷</span><span>फ़ोटो</span>';
+  document.getElementById('schGpsDisplay').style.display='none';
+  document.getElementById('schoolFormTitle').textContent='➕ नया स्कूल जोड़ें';
+  document.getElementById('saveSchoolBtn').textContent='💾 Save School';
+}
+
+function editSchool(key) {
+  const s=schools[key];
+  document.getElementById('sch-name').value=s.name||'';
+  document.getElementById('sch-udise').value=s.udise||'';
+  document.getElementById('sch-head').value=s.head||'';
+  document.getElementById('sch-contact').value=s.contact||'';
+  document.getElementById('sch-year').value=s.year||'';
+  document.getElementById('sch-medium').value=s.medium||'';
+  document.getElementById('sch-classes').value=s.classes||'';
+  document.getElementById('sch-type').value=s.type||'';
+  document.getElementById('sch-address').value=s.address||'';
+  document.getElementById('sch-lat').value=s.lat||'';
+  document.getElementById('sch-lng').value=s.lng||'';
+  currentSchPhotoB64=s.photo||'';
+  document.getElementById('schPhotoBox').innerHTML=s.photo?`<img src="${s.photo}">`:'<span>📷</span><span>फ़ोटो</span>';
+  if(s.lat&&s.lng){const d=document.getElementById('schGpsDisplay');d.style.display='inline';d.textContent=`📍 ${parseFloat(s.lat).toFixed(4)}, ${parseFloat(s.lng).toFixed(4)}`;}
+  editSchoolKey=key;
+  document.getElementById('schoolFormTitle').textContent='✏ स्कूल अपडेट करें';
+  document.getElementById('saveSchoolBtn').textContent='💾 Update School';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteSchool(key) {
+  if(!confirm(`"${schools[key].name}" को हटाएं?`)) return;
+  db.ref('schools/'+key).remove().then(()=>showToast('हटा दिया गया।'));
+}
+
+function viewSchool(key) {
+  const s=schools[key];
+  document.getElementById('modalContent').innerHTML=`
+    <h2>🏫 ${escH(s.name)}</h2>
+    ${s.photo?`<img src="${s.photo}" class="view-photo">`:''}
+    <div class="vf-label">UDISE कोड</div><div class="vf-val">${escH(s.udise)||'-'}</div>
+    <div class="vf-label">प्रधानाध्यापक</div><div class="vf-val">${escH(s.head)||'-'}</div>
+    <div class="vf-label">संपर्क</div><div class="vf-val">${escH(s.contact)||'-'}</div>
+    <div class="vf-label">स्थापना वर्ष</div><div class="vf-val">${escH(s.year)||'-'}</div>
+    <div class="vf-label">माध्यम</div><div class="vf-val">${escH(s.medium)||'-'}</div>
+    <div class="vf-label">कक्षाएँ</div><div class="vf-val">${escH(s.classes)||'-'}</div>
+    <div class="vf-label">प्रकार</div><div class="vf-val">${escH(s.type)||'-'}</div>
+    <div class="vf-label">पता</div><div class="vf-val">${escH(s.address)||'-'}</div>
+    ${s.lat&&s.lng?`<div class="vf-label">Location</div><div class="vf-val"><a href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}" target="_blank">🗺 Google Maps पर देखें</a></div>`:''}
+  `;
+  document.getElementById('viewModal').classList.add('open');
+}
+
+function renderSchools() {
+  const search=(document.getElementById('sch-search')||{}).value||'';
+  const ft=(document.getElementById('sch-filterType')||{}).value||'';
+  const sl=search.toLowerCase();
+  const arr=Object.entries(schools).map(([k,v])=>({...v,_key:k}));
+  let list=arr.filter(s=>(!sl||(s.name||'').toLowerCase().includes(sl)||(s.udise||'').toLowerCase().includes(sl)||(s.address||'').toLowerCase().includes(sl)||(s.head||'').toLowerCase().includes(sl))&&(!ft||s.type===ft));
+  document.getElementById('sch-count').textContent=`कुल ${list.length} स्कूल`;
+  const el=document.getElementById('schoolList');
+  if(!list.length){el.innerHTML=`<div class="empty-state"><div class="empty-icon">🏫</div><p>कोई स्कूल नहीं। ऊपर फॉर्म से जोड़ें।</p></div>`;return;}
+  el.innerHTML=list.map(s=>`
+    <div class="record-card">
+      <div class="record-photo">${s.photo?`<img src="${s.photo}">`:'🏫'}</div>
+      <div class="record-info">
+        <div class="record-name">${escH(s.name)}</div>
+        <div class="record-meta">${s.udise?`<span class="tag">UDISE: ${escH(s.udise)}</span>`:''} ${s.type?`<span class="tag saffron">${escH(s.type)}</span>`:''} ${s.classes?`<span class="tag green">${escH(s.classes)}</span>`:''}</div>
+        <div class="record-meta" style="margin-top:2px;">👤 ${escH(s.head)||'-'} | 📞 ${escH(s.contact)||'-'} | 📍 ${escH(s.address)||'-'}</div>
+      </div>
+      <div class="record-actions">
+        <button class="btn btn-primary btn-sm" onclick="viewSchool('${s._key}')">👁</button>
+        ${s.lat&&s.lng?`<button class="btn btn-green btn-sm" onclick="window.open('https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}','_blank')">🗺</button>`:''}
+        <button class="btn btn-ghost btn-sm" onclick="editSchool('${s._key}')">✏</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteSchool('${s._key}')">🗑</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function exportSchoolsExcel(){
+  const arr=Object.values(schools);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const ws=XLSX.utils.json_to_sheet(arr.map((s,i)=>({'#':i+1,'स्कूल नाम':s.name,'UDISE':s.udise,'प्रधानाध्यापक':s.head,'संपर्क':s.contact,'स्थापना':s.year,'माध्यम':s.medium,'कक्षाएँ':s.classes,'प्रकार':s.type,'पता':s.address,'Lat':s.lat||'','Lng':s.lng||''})));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Schools'); XLSX.writeFile(wb,'Schools_Record_Mungwani.xlsx'); showToast('Excel download हो रही है!');
+}
+
+function exportSchoolsPDF(){
+  const arr=Object.values(schools);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'});
+  doc.setFontSize(13); doc.text('विद्यालय रिकॉर्ड',14,13);
+  doc.setFontSize(8); doc.text(`Date: ${new Date().toLocaleDateString()} | Total: ${arr.length}`,14,19);
+  doc.autoTable({head:[['#','नाम','UDISE','प्रधानाध्यापक','संपर्क','माध्यम','कक्षाएँ','प्रकार','पता']],body:arr.map((s,i)=>[i+1,s.name,s.udise,s.head,s.contact,s.medium,s.classes,s.type,s.address]),startY:23,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[26,43,74]}});
+  doc.save('Schools_Record.pdf'); showToast('PDF download हो रही है!');
+}
+
+// ============================================================
+//  DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const sarr=Object.values(students); const tarr=Object.values(teachers);
+  document.getElementById('ds-students').textContent=sarr.length;
+  document.getElementById('ds-teachers').textContent=tarr.length;
+  document.getElementById('ds-total').textContent=Object.keys(schools).length;
+  const recent=[...sarr].slice(-5).reverse();
+  document.getElementById('dash-s-list').innerHTML=recent.length?recent.map(s=>`<div class="mini-row"><div class="mini-avatar">${s.photo?`<img src="${s.photo}">`:'👤'}</div><div><div class="mini-name">${escH(s.name)}</div><div class="mini-sub">Class ${escH(s.cls)} | Roll ${escH(s.roll)}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:0.8rem;padding:8px 0;">अभी कोई छात्र नहीं।</div>';
+  document.getElementById('dash-t-list').innerHTML=tarr.length?tarr.map(t=>`<div class="mini-row"><div class="mini-avatar">${t.photo?`<img src="${t.photo}">`:'👤'}</div><div><div class="mini-name">${escH(t.name)}</div><div class="mini-sub">${escH(t.subject)||'-'}</div></div></div>`).join(''):'<div style="color:var(--muted);font-size:0.8rem;padding:8px 0;">अभी कोई शिक्षक नहीं।</div>';
+}
+
+// ============================================================
+//  EXPORT
+// ============================================================
+function exportStudentsExcel(){
+  const arr=Object.values(students);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const ws=XLSX.utils.json_to_sheet(arr.map((s,i)=>({'#':i+1,'नाम':s.name,'Roll':s.roll,'Class':s.cls,'पिता':s.father,'DOB':s.dob,'Contact':s.contact,'Blood':s.blood,'पता':s.address,'Lat':s.lat||'','Lng':s.lng||'','Maps':(s.lat&&s.lng)?`https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lng}`:''})));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Students'); XLSX.writeFile(wb,'Students_Record_Mungwani.xlsx'); showToast('Excel download हो रही है!');
+}
+function exportTeachersExcel(){
+  const arr=Object.values(teachers);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const ws=XLSX.utils.json_to_sheet(arr.map((t,i)=>({'#':i+1,'नाम':t.name,'EmpID':t.empid,'विषय':t.subject,'Class':t.cls,'Contact':t.contact,'Qual':t.qual,'अनुभव':t.exp})));
+  const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'Teachers'); XLSX.writeFile(wb,'Teachers_Record_Mungwani.xlsx'); showToast('Excel download हो रही है!');
+}
+function exportStudentsPDF(){
+  const arr=Object.values(students);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF({orientation:'landscape'});
+  doc.setFontSize(13); doc.text('विद्यालय - छात्र रिकॉर्ड',14,13);
+  doc.setFontSize(8); doc.text(`Date: ${new Date().toLocaleDateString()} | Total: ${arr.length}`,14,19);
+  doc.autoTable({head:[['#','नाम','Roll','Class','पिता','Contact','Blood','Lat','Lng']],body:arr.map((s,i)=>[i+1,s.name,s.roll,s.cls,s.father,s.contact,s.blood,s.lat||'',s.lng||'']),startY:23,styles:{fontSize:7,cellPadding:2},headStyles:{fillColor:[26,43,74]}});
+  doc.save('Students_Record.pdf'); showToast('PDF download हो रही है!');
+}
+function exportTeachersPDF(){
+  const arr=Object.values(teachers);
+  if(!arr.length){showToast('कोई डेटा नहीं।');return;}
+  const {jsPDF}=window.jspdf; const doc=new jsPDF();
+  doc.setFontSize(13); doc.text('विद्यालय - शिक्षक रिकॉर्ड',14,13);
+  doc.autoTable({head:[['#','नाम','EmpID','विषय','Class','Contact','Qual']],body:arr.map((t,i)=>[i+1,t.name,t.empid,t.subject,t.cls,t.contact,t.qual]),startY:22,styles:{fontSize:8,cellPadding:2},headStyles:{fillColor:[26,43,74]}});
+  doc.save('Teachers_Record.pdf'); showToast('PDF download हो रही है!');
+}
+
+// ============================================================
+//  MODAL / UTIL
+// ============================================================
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.getElementById('viewModal').addEventListener('click',function(e){if(e.target===this)closeModal('viewModal');});
+document.getElementById('importModal').addEventListener('click',function(e){if(e.target===this)closeModal('importModal');});
+function escH(t){if(!t)return '';const d=document.createElement('div');d.textContent=t;return d.innerHTML;}
+
+// ============================================================
+//  INIT — auto-connect if config saved
+// ============================================================
+(function(){
+  const cfg=getSavedConfig();
+  if(cfg){ initFirebase(cfg); }
+  // else setup screen remains visible
+})();
+</script>
+</body>
+</html>
